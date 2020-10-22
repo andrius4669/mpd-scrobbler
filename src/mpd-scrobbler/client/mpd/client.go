@@ -40,7 +40,16 @@ type Client struct {
 }
 
 // Attrs is a set of attributes returned by MPD.
-type Attrs map[string]string
+type Attrs map[string][]string
+
+func (attrs Attrs) First(key string) string {
+	v := attrs[key]
+	if len(v) > 0 {
+		return v[0]
+	} else {
+		return ""
+	}
+}
 
 // Dial connects to MPD listening on address addr (e.g. "127.0.0.1:6600")
 // on network network (e.g. "tcp").
@@ -141,7 +150,7 @@ func (c *Client) readAttrs(terminator string) (attrs Attrs, err error) {
 			return nil, textproto.ProtocolError("can't parse line: " + line)
 		}
 		key := line[0:z]
-		attrs[key] = line[z+2:]
+		attrs[key] = append(attrs[key], line[z+2:])
 	}
 	return
 }
@@ -170,13 +179,13 @@ func (c *Client) CurrentSong() (Song, error) {
 	}
 
 	return Song{
-		Title:       s["Title"],
-		Artist:      s["Artist"],
-		Album:       s["Album"],
-		AlbumArtist: s["AlbumArtist"],
-		Track:       s["Track"],
-		File:        s["file"],
-		Duration:    s["duration"],
+		Title:       s.First("Title"),
+		Artist:      s.First("Artist"),
+		Album:       s.First("Album"),
+		AlbumArtist: s.First("AlbumArtist"),
+		Track:       s.First("Track"),
+		File:        s.First("file"),
+		Duration:    s.First("duration"),
 	}, nil
 }
 
@@ -192,13 +201,13 @@ func (c *Client) CurrentPos() (pos Pos, playing bool, err error) {
 		return
 	}
 
-	if st["volume"] == "-1" || st["state"] != "play" || st["time"] == "" {
+	if st.First("volume") == "-1" || st.First("state") != "play" || st.First("time") == "" {
 		playing = false
 		return
 	}
 	playing = true
 
-	parts := strings.Split(st["time"], ":")
+	parts := strings.Split(st.First("time"), ":")
 	pos.Seconds, err = strconv.Atoi(parts[0])
 	if err != nil {
 		return
@@ -222,7 +231,7 @@ func (c *Client) PlayTime() (int, error) {
 		return 0, err
 	}
 
-	return strconv.Atoi(s["playtime"])
+	return strconv.Atoi(s.First("playtime"))
 }
 
 func (c *Client) readOKLine(terminator string) (err error) {
